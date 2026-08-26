@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobil Feign - Gece Motoru</title>
+    <title>Mobil Feign - Lobi Sistemi</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
         h1 { font-size: 1.5rem; text-align: center; color: #38bdf8; }
         .card { background: #1e293b; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        #log { height: 200px; overflow-y: scroll; background: #090d16; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px; }
+        #log { height: 180px; overflow-y: scroll; background: #090d16; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px; }
         select, button, input { width: 100%; padding: 12px; margin-top: 8px; border-radius: 8px; border: none; font-size: 1rem; box-sizing: border-box; }
         select, input { background: #334155; color: white; }
         button { background: #0ea5e9; color: white; font-weight: bold; cursor: pointer; }
@@ -17,10 +17,8 @@
         .hidden { display: none !important; }
         .danger-btn { background: #ef4444 !important; }
         .danger-btn:active { background: #dc2626 !important; }
-        .player-list { font-size: 0.9rem; color: #94a3b8; margin-top: 10px; background: #0f172a; padding: 10px; border-radius: 8px;}
-        .player-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #334155; }
-        .player-row:last-child { border-bottom: none; }
-        .kick-btn { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; width: auto; margin-top: 0; font-size: 0.8rem; }
+        .player-row { display: flex; justify-content: space-between; align-items: center; background: #334155; padding: 8px 12px; margin-top: 5px; border-radius: 6px; font-size: 0.9rem; }
+        .kick-btn { background: #ef4444; border: none; color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; width: auto; margin-top: 0; }
         .role-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-weight: bold; background: #38bdf8; color: #0f172a; margin-top: 5px; }
     </style>
 </head>
@@ -28,40 +26,34 @@
 
     <h1>Mobil Feign</h1>
 
-    <div id="loginScreen" class="card">
-        <h3>Oyuna Katıl veya Oda Kur</h3>
+    <div id="lobbyScreen" class="card">
+        <h3>Oda İşlemleri</h3>
         <input type="text" id="playerNameInput" placeholder="Adın (Örn: Ahmet)..." maxlength="15">
         
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #334155;">
-            <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 5px;">Mevcut Odaya Katıl</p>
-            <input type="text" id="roomCodeInput" placeholder="Oda Kodu Girin..." maxlength="6" style="text-transform: uppercase;">
-            <button onclick="joinRoom()">Odaya Katıl</button>
-        </div>
+        <hr style="border: 0; border-top: 1px solid #334155; margin: 15px 0;">
+        
+        <h4>Yeni Oda Kur (Lider Ol)</h4>
+        <input type="text" id="newRoomCodeInput" placeholder="Oda Kodu Belirle (Örn: ODA1)" maxlength="10">
+        <button onclick="createRoom()" style="background: #10b981;">Oda Oluştur</button>
 
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #334155;">
-            <p style="font-size: 0.9rem; color: #94a3b8; margin-bottom: 5px;">Veya Yeni Oyun Başlat</p>
-            <button onclick="createRoom()" style="background: #10b981;">Yeni Oda Kur (Lider)</button>
-        </div>
+        <hr style="border: 0; border-top: 1px solid #334155; margin: 15px 0;">
+
+        <h4>Var Olan Odaya Katıl</h4>
+        <input type="text" id="joinRoomCodeInput" placeholder="Katılacağın Oda Kodu..." maxlength="10">
+        <button onclick="joinRoom()">Odaya Katıl</button>
     </div>
 
     <div id="gameScreen" class="hidden">
-        <div class="card" style="text-align: center; border: 2px solid #10b981;">
-            <span style="color: #94a3b8; font-size: 0.9rem;">Oda Kodu:</span>
-            <h2 id="displayRoomCode" style="margin: 5px 0; color: #10b981; letter-spacing: 2px;">XXXXXX</h2>
-        </div>
-
         <div class="card">
-            <div>Oda Durumu: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor</span></div>
+            <div>Oda: <span id="currentRoomTitle" style="color: #38bdf8; font-weight: bold;">-</span> | Durum: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor</span></div>
             <div id="playerInfo" style="margin-top: 8px;">Rolün: <span id="myRole" class="role-badge">Henüz atanmadı</span></div>
-            
-            <div class="player-list" id="playerListContainer">
-                <!-- Oyuncular buraya dinamik eklenecek -->
-            </div>
+            <div style="margin-top: 12px; font-weight: bold; color: #94a3b8;">Odadaki Oyuncular:</div>
+            <div id="playersListContainer" style="margin-top: 5px;"></div>
         </div>
 
         <div class="card">
             <h3>Oyun Günlüğü</h3>
-            <div id="log">Sisteme bağlanıldı.<br></div>
+            <div id="log">Odaya hoş geldin!<br></div>
         </div>
 
         <div class="card" id="actionPanel">
@@ -76,21 +68,20 @@
             <h3 style="color: #f59e0b; margin-top:0;">Lider Paneli</h3>
             <button onclick="startMatch()">Oyunu Başlat & Rolleri Dağıt</button>
             <button style="background: #10b981; margin-top: 5px;" onclick="resolveNight()">Geceyi Bitir & Sabahı Hesapla</button>
-            <button class="danger-btn" style="margin-top: 5px;" onclick="resetGame()">Oyunu Sıfırla (Lobiye Dön)</button>
+            <button class="danger-btn" style="margin-top: 5px;" onclick="leaveRoom()">Odayı Kapat / Çık</button>
         </div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://sulphxhrguiahelilyww.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeGhyZ3VpYWhlbGlseXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MzU5MDIsImV4cCI6MjEwMzMxMTkwMn0.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeHJndWlhaGVsaWx5d3ciLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4NzczNTkwMiwiZXhwIjoyMDUzMzExOTAyfQ.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let myName = "";
+        let currentRoom = "";
         let isLeader = false;
-        let currentRoomCode = "";
-        let currentRoomId = null; 
-        let gameState = { players: [], room_phase: "Bekliyor", actions: {}, logs: [] };
+        let roomData = null;
 
         function logMessage(msg) {
             const log = document.getElementById('log');
@@ -98,149 +89,148 @@
             log.scrollTop = log.scrollHeight;
         }
 
-        // Rastgele 6 haneli oda kodu üretir
-        function generateRoomCode() {
-            return Math.random().toString(36).substring(2, 8).toUpperCase();
-        }
-
         async function createRoom() {
-            const nameInput = document.getElementById('playerNameInput').value.trim();
-            if(!nameInput) return alert("Lütfen adını yaz!");
+            myName = document.getElementById('playerNameInput').value.trim();
+            currentRoom = document.getElementById('newRoomCodeInput').value.trim().toUpperCase();
 
-            myName = nameInput;
-            isLeader = true;
-            currentRoomCode = generateRoomCode();
-
-            const newRoomData = {
-                room_code: currentRoomCode,
-                room_phase: 'Bekliyor',
-                players: [{ name: myName, role: 'Atanmadı', status: 'Yaşıyor' }],
-                actions: {},
-                logs: [`${myName} odayı kurdu. Oda Kodu: ${currentRoomCode}`]
-            };
-
-            try {
-                // Supabase'e yeni oda satırını ekle
-                let { data, error } = await supabaseClient.from('game_state').insert([newRoomData]).select().single();
-                if (error) throw error;
-
-                currentRoomId = data.id; // Veritabanındaki gerçek satır ID'si
-                enterGameScreen();
-            } catch (err) {
-                alert("Oda kurulamadı: " + err.message);
+            if(!myName || !currentRoom) {
+                alert("Lütfen adını ve bir oda kodu yaz!");
+                return;
             }
+
+            let { data: existing } = await supabaseClient.from('rooms').select('*').eq('room_code', currentRoom).single();
+            if(existing) {
+                alert("Bu oda kodu zaten kullanımda! Başka bir kod dene.");
+                return;
+            }
+
+            isLeader = true;
+            let newPlayers = [{ name: myName, role: 'Lider', status: 'Yaşıyor' }];
+
+            let { error } = await supabaseClient.from('rooms').insert([{
+                room_code: currentRoom,
+                host_name: myName,
+                room_phase: 'Bekliyor',
+                players: newPlayers,
+                actions: {},
+                logs: [`Oda ${currentRoom} kuruldu. Lider: ${myName}`]
+            }]);
+
+            if(error) {
+                alert("Oda kurulamadı: " + error.message);
+                return;
+            }
+
+            enterGameScreen();
         }
 
         async function joinRoom() {
-            const nameInput = document.getElementById('playerNameInput').value.trim();
-            const codeInput = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            myName = document.getElementById('playerNameInput').value.trim();
+            currentRoom = document.getElementById('joinRoomCodeInput').value.trim().toUpperCase();
 
-            if(!nameInput) return alert("Lütfen adını yaz!");
-            if(!codeInput) return alert("Lütfen oda kodunu yaz!");
-
-            myName = nameInput;
-            isLeader = false;
-            currentRoomCode = codeInput;
-
-            try {
-                // Oda koduna göre veritabanında arama yap
-                let { data, error } = await supabaseClient.from('game_state').select('*').eq('room_code', currentRoomCode).single();
-                if (error || !data) throw new Error("Bu koda sahip aktif bir oda bulunamadı!");
-
-                currentRoomId = data.id;
-                let currentPlayers = data.players || [];
-                
-                // İsim çakışması kontrolü
-                if(currentPlayers.find(p => p.name === myName)) {
-                    return alert("Bu isimde biri zaten odada var, başka bir isim seç!");
-                }
-
-                currentPlayers.push({ name: myName, role: 'Atanmadı', status: 'Yaşıyor' });
-                await supabaseClient.from('game_state').update({ players: currentPlayers }).eq('id', currentRoomId);
-
-                enterGameScreen();
-            } catch (err) {
-                alert("Bağlantı Hatası: " + err.message);
+            if(!myName || !currentRoom) {
+                alert("Lütfen adını ve katılmak istediğin oda kodunu yaz!");
+                return;
             }
+
+            let { data: room, error } = await supabaseClient.from('rooms').select('*').eq('room_code', currentRoom).single();
+            if(error || !room) {
+                alert("Böyle bir oda bulunamadı!");
+                return;
+            }
+
+            if(room.room_phase !== 'Bekliyor') {
+                alert("Bu oyun zaten başlamış!");
+                return;
+            }
+
+            isLeader = false;
+            let players = room.players || [];
+            if(!players.find(p => p.name === myName)) {
+                players.push({ name: myName, role: 'Atanmadı', status: 'Yaşıyor' });
+                await supabaseClient.from('rooms').update({ players: players }).eq('room_code', currentRoom);
+            }
+
+            enterGameScreen();
         }
 
         function enterGameScreen() {
-            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('lobbyScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
-            document.getElementById('displayRoomCode').innerText = currentRoomCode;
+            document.getElementById('currentRoomTitle').innerText = currentRoom;
 
             if(isLeader) {
                 document.getElementById('leaderPanel').classList.remove('hidden');
+            } else {
+                document.getElementById('leaderPanel').classList.add('hidden');
             }
 
             subRealtime();
-            fetchState();
+            fetchRoomState();
         }
 
-        async function fetchState() {
-            if(!currentRoomId) return;
-            let { data } = await supabaseClient.from('game_state').select('*').eq('id', currentRoomId).single();
+        async function fetchRoomState() {
+            let { data } = await supabaseClient.from('rooms').select('*').eq('room_code', currentRoom).single();
             if(data) updateUI(data);
         }
 
         function subRealtime() {
-            // Sadece bulunduğumuz odanın (id) güncellemelerini dinleriz
             supabaseClient
-                .channel('room_' + currentRoomId)
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_state', filter: `id=eq.${currentRoomId}` }, payload => {
-                    updateUI(payload.new);
+                .channel('room_' + currentRoom)
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${currentRoom}` }, payload => {
+                    if(payload.eventType === 'DELETE') {
+                        alert("Oda lider tarafından kapatıldı!");
+                        location.reload();
+                    } else if(payload.new) {
+                        updateUI(payload.new);
+                    }
                 })
                 .subscribe();
         }
 
-        function updateUI(state) {
-            gameState = state;
+        function updateUI(room) {
+            roomData = room;
 
-            // Eğer listede yoksam (Atıldıysam veya oda sıfırlandıysa) ana sayfaya dön
-            const me = (state.players || []).find(p => p.name === myName);
-            if(!me) {
-                alert("Odadan ayrıldınız veya oyun lider tarafından sıfırlandı!");
+            let meStillHere = (room.players || []).find(p => p.name === myName);
+            if(!meStillHere) {
+                alert("Lider tarafından odadan atıldın!");
                 location.reload();
                 return;
             }
 
-            document.getElementById('phase').innerText = state.room_phase;
-            if(me.role) document.getElementById('myRole').innerText = me.role;
+            document.getElementById('phase').innerText = room.room_phase;
 
-            // Oyuncu Listesini ve Atma butonlarını oluştur
-            const pListContainer = document.getElementById('playerListContainer');
-            pListContainer.innerHTML = '<div style="color: #cbd5e1; margin-bottom: 8px;">Odadakiler:</div>';
-            
-            (state.players || []).forEach(p => {
+            const container = document.getElementById('playersListContainer');
+            container.innerHTML = '';
+            (room.players || []).forEach(p => {
                 let row = document.createElement('div');
                 row.className = 'player-row';
+                row.innerHTML = `<span>${p.name} (${p.role || 'Bekliyor'}) - <b>${p.status || 'Yaşıyor'}</b></span>`;
                 
-                let nameSpan = document.createElement('span');
-                nameSpan.innerText = `${p.name} (${p.status || 'Yaşıyor'})`;
-                
-                row.appendChild(nameSpan);
-
-                // Lidersek ve kendimiz değilsek "At" butonu ekle
-                if(isLeader && p.name !== myName) {
+                if(isLeader && p.name !== myName && room.room_phase === 'Bekliyor') {
                     let kickBtn = document.createElement('button');
                     kickBtn.className = 'kick-btn';
                     kickBtn.innerText = 'At';
                     kickBtn.onclick = () => kickPlayer(p.name);
                     row.appendChild(kickBtn);
                 }
-                
-                pListContainer.appendChild(row);
+                container.appendChild(row);
             });
 
-            if(state.logs && state.logs.length > 0) {
+            const me = (room.players || []).find(p => p.name === myName);
+            if(me && me.role) {
+                document.getElementById('myRole').innerText = me.role;
+            }
+
+            if(room.logs && room.logs.length > 0) {
                 const logDiv = document.getElementById('log');
-                logDiv.innerHTML = state.logs.join('<br>') + '<br>';
+                logDiv.innerHTML = room.logs.join('<br>') + '<br>';
                 logDiv.scrollTop = logDiv.scrollHeight;
             }
 
             const targetSelect = document.getElementById('targetSelect');
             targetSelect.innerHTML = '<option value="">Hedef Seç...</option>';
-            (state.players || []).forEach(p => {
+            (room.players || []).forEach(p => {
                 if(p.name !== myName && p.status !== 'Ölü') {
                     let opt = document.createElement('option');
                     opt.value = p.name;
@@ -252,25 +242,15 @@
 
         async function kickPlayer(targetName) {
             if(!isLeader) return;
-            if(!confirm(`${targetName} adlı oyuncuyu odadan atmak istiyor musun?`)) return;
-
-            let currentPlayers = gameState.players || [];
-            // Hedef oyuncuyu listeden çıkart
-            currentPlayers = currentPlayers.filter(p => p.name !== targetName);
-
-            let logs = gameState.logs || [];
-            logs.push(`${targetName} odadan atıldı.`);
-
-            await supabaseClient.from('game_state').update({ players: currentPlayers, logs: logs }).eq('id', currentRoomId);
+            let updatedPlayers = roomData.players.filter(p => p.name !== targetName);
+            let logs = [...(roomData.logs || []), `${targetName} odadan atıldı.`];
+            await supabaseClient.from('rooms').update({ players: updatedPlayers, logs: logs }).eq('room_code', currentRoom);
         }
 
         async function startMatch() {
             if(!isLeader) return;
-            let players = gameState.players || [];
-            if(players.length === 0) {
-                alert("Odada hiç oyuncu yok!");
-                return;
-            }
+            let players = roomData.players || [];
+            if(players.length === 0) return;
 
             let baseRoles = ["Doktor", "Katil", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
             let shuffledRoles = baseRoles.sort(() => 0.5 - Math.random());
@@ -280,14 +260,14 @@
                 p.status = 'Yaşıyor';
             });
 
-            let initialLogs = [...(gameState.logs || []), "--- Lider oyunu başlattı! Roller dağıtıldı. ---"];
+            let logs = [...(roomData.logs || []), "Oyun başladı! Roller dağıtıldı, gece vakti."];
 
-            await supabaseClient.from('game_state').update({ 
+            await supabaseClient.from('rooms').update({ 
                 room_phase: 'Gece (Aksiyon Zamanı)', 
                 players: players,
                 actions: {},
-                logs: initialLogs
-            }).eq('id', currentRoomId);
+                logs: logs
+            }).eq('room_code', currentRoom);
         }
 
         async function submitAction() {
@@ -296,80 +276,57 @@
                 alert("Lütfen bir hedef seç!");
                 return;
             }
-            let actions = gameState.actions || {};
+            let actions = roomData.actions || {};
             actions[myName] = target;
 
-            await supabaseClient.from('game_state').update({ actions: actions }).eq('id', currentRoomId);
+            await supabaseClient.from('rooms').update({ actions: actions }).eq('room_code', currentRoom);
             logMessage(`Seçimin kaydedildi: ${target}`);
         }
 
         async function resolveNight() {
             if(!isLeader) return;
-            let players = gameState.players || [];
-            let actions = gameState.actions || {};
-            let nightLogs = [...(gameState.logs || []), "--- GECE SONUÇLANDI ---"];
+            let players = roomData.players || [];
+            let actions = roomData.actions || {};
+            let nightLogs = [...(roomData.logs || []), "--- GECE SONUÇLANDI ---"];
 
             let doctorTarget = null;
             let killerTarget = null;
-            let watcherTarget = null;
-            let scoutTarget = null;
-            let snitchTarget = null;
 
             players.forEach(p => {
                 let target = actions[p.name];
                 if (!target) return;
                 if (p.role === 'Doktor') doctorTarget = { from: p.name, to: target };
                 if (p.role === 'Katil') killerTarget = { from: p.name, to: target };
-                if (p.role === 'Gözcü') watcherTarget = { from: p.name, to: target };
-                if (p.role === 'İzci') scoutTarget = { from: p.name, to: target };
-                if (p.role === 'İspiyoncu') snitchTarget = { from: p.name, to: target };
             });
 
-            let targetKilled = null;
             if (killerTarget) {
-                targetKilled = killerTarget.to;
+                let targetKilled = killerTarget.to;
                 if (doctorTarget && doctorTarget.to === targetKilled) {
-                    nightLogs.push(`Doktor, hedefini başarıyla korudu!`);
-                    targetKilled = null;
+                    nightLogs.push(`Doktor, katilin hedefi olan ${targetKilled}'i korudu!`);
                 } else {
-                    nightLogs.push(`Katil dehşet saçtı! ${targetKilled} gece saldırıya uğradı.`);
+                    nightLogs.push(`Katil ${targetKilled}'i öldürdü!`);
                     let victim = players.find(p => p.name === targetKilled);
                     if (victim) victim.status = 'Ölü';
                 }
             }
 
-            if (watcherTarget) {
-                let visitors = [];
-                if (killerTarget && killerTarget.to === watcherTarget.to) visitors.push("Katil");
-                if (doctorTarget && doctorTarget.to === watcherTarget.to) visitors.push("Doktor");
-                nightLogs.push(`[Gözcü Bilgisi] ${watcherTarget.from}, ${watcherTarget.to} isimli kişinin evine ${visitors.length} kişinin geldiğini gördü.`);
-            }
+            nightLogs.push("Sabah oldu!");
 
-            if (scoutTarget) {
-                let destination = actions[scoutTarget.to] || "hiçbir yere gitmedi";
-                nightLogs.push(`[İzci Bilgisi] ${scoutTarget.from}, ${scoutTarget.to}'in ${destination} adresine gittiğini öğrendi.`);
-            }
-
-            if (snitchTarget) {
-                nightLogs.push(`[İspiyoncu Bilgisi] ${snitchTarget.from} sabah ${snitchTarget.to} kişinin rolünü öğrendi.`);
-            }
-
-            nightLogs.push("Sabah oldu, kasaba uyanıyor!");
-
-            await supabaseClient.from('game_state').update({ 
-                room_phase: 'Gündüz (Tartışma & Oylama)', 
+            await supabaseClient.from('rooms').update({ 
+                room_phase: 'Gündüz', 
                 players: players,
                 actions: {},
                 logs: nightLogs
-            }).eq('id', currentRoomId);
+            }).eq('room_code', currentRoom);
         }
 
-        async function resetGame() {
-            if(!isLeader) return;
-            if(confirm("Oyunu bitirip herkesi lobiye (giriş ekranına) göndermek istiyor musun?")) {
-                // Veritabanından odayı tamamen silebiliriz veya oyuncuları temizleyebiliriz.
-                // En temizi oyuncu listesini boşaltmaktır, böylece herkesin ekranı yenilenir.
-                await supabaseClient.from('game_state').update({ players: [] }).eq('id', currentRoomId);
+        async function leaveRoom() {
+            if(isLeader) {
+                if(confirm("Odayı tamamen kapatmak istiyor musun?")) {
+                    await supabaseClient.from('rooms').delete().eq('room_code', currentRoom);
+                    location.reload();
+                }
+            } else {
                 location.reload();
             }
         }
