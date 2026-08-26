@@ -58,11 +58,21 @@
 
         <!-- GECE AKSİYON PANELİ -->
         <div class="card" id="actionPanel">
-            <h3>Gece Aksiyonu / Seçim</h3>
+            <h3>Gece Aksiyonu</h3>
+            <label style="font-size: 0.9rem; color: #94a3b8;">Hedef:</label>
             <select id="targetSelect">
                 <option value="">Hedef Seç...</option>
             </select>
-            <button onclick="submitAction()">Aksiyonu Gönder</button>
+
+            <div id="katilActionContainer" class="hidden" style="margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px;">
+                <label style="font-size: 0.9rem; color: #ef4444; font-weight: bold;">Aksiyon Türü (Sadece Katil):</label>
+                <select id="actionTypeSelect">
+                    <option value="kill">🔪 Hedefi Öldür</option>
+                    <option value="role">🎭 Kendi Rol Yeteneğini Kullan</option>
+                </select>
+            </div>
+
+            <button onclick="submitAction()" style="margin-top: 15px;">Aksiyonu Gönder</button>
         </div>
 
         <!-- GÜNDÜZ OYLAMA PANELİ -->
@@ -85,7 +95,7 @@
 
     <script>
         const SUPABASE_URL = 'https://sulphxhrguiahelilyww.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeGhyZ3VpYWhlbGlseXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MzU5MDIsImV4cCI6MjEwMzMxMTkwMn0.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
+        const SUPABASE_KEY = 'EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeGhyZ3VpYWhlbGlseXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MzU5MDIsImV4cCI6MjEwMzMxMTkwMn0.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -116,7 +126,7 @@
             }
 
             isLeader = true;
-            let newPlayers = [{ name: myName, role: 'Lider', status: 'Yaşıyor', privateLogs: [], vote: null }];
+            let newPlayers = [{ name: myName, role: 'Lider', team: 'Lider', displayRole: 'Lider', status: 'Yaşıyor', privateLogs: [], vote: null }];
 
             let { error } = await supabaseClient.from('rooms').insert([{
                 room_code: currentRoom,
@@ -126,11 +136,7 @@
                 logs: [`Oda ${currentRoom} kuruldu. Lider: ${myName}`]
             }]);
 
-            if(error) {
-                alert("Oda kurulamadı: " + error.message);
-                return;
-            }
-
+            if(error) return alert("Hata: " + error.message);
             enterGameScreen();
         }
 
@@ -138,29 +144,18 @@
             myName = document.getElementById('playerNameInput').value.trim();
             currentRoom = document.getElementById('joinRoomCodeInput').value.trim().toUpperCase();
 
-            if(!myName || !currentRoom) {
-                alert("Lütfen adını ve oda kodunu yaz!");
-                return;
-            }
+            if(!myName || !currentRoom) return alert("Lütfen adını ve oda kodunu yaz!");
 
             let { data: room, error } = await supabaseClient.from('rooms').select('*').eq('room_code', currentRoom).single();
-            if(error || !room) {
-                alert("Böyle bir oda bulunamadı!");
-                return;
-            }
-
-            if(room.room_phase !== 'Bekliyor') {
-                alert("Bu oyun zaten başlamış!");
-                return;
-            }
+            if(error || !room) return alert("Oda bulunamadı!");
+            if(room.room_phase !== 'Bekliyor') return alert("Bu oyun zaten başlamış!");
 
             isLeader = false;
             let players = room.players || [];
             if(!players.find(p => p.name === myName)) {
-                players.push({ name: myName, role: 'Atanmadı', status: 'Yaşıyor', privateLogs: [], vote: null });
+                players.push({ name: myName, role: 'Atanmadı', team: 'Atanmadı', displayRole: 'Atanmadı', status: 'Yaşıyor', privateLogs: [], vote: null });
                 await supabaseClient.from('rooms').update({ players: players }).eq('room_code', currentRoom);
             }
-
             enterGameScreen();
         }
 
@@ -169,11 +164,8 @@
             document.getElementById('gameScreen').classList.remove('hidden');
             document.getElementById('currentRoomTitle').innerText = currentRoom;
 
-            if(isLeader) {
-                document.getElementById('leaderPanel').classList.remove('hidden');
-            } else {
-                document.getElementById('leaderPanel').classList.add('hidden');
-            }
+            if(isLeader) document.getElementById('leaderPanel').classList.remove('hidden');
+            else document.getElementById('leaderPanel').classList.add('hidden');
 
             subRealtime();
             fetchRoomState();
@@ -185,32 +177,21 @@
         }
 
         function subRealtime() {
-            supabaseClient
-                .channel('room_' + currentRoom)
+            supabaseClient.channel('room_' + currentRoom)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `room_code=eq.${currentRoom}` }, payload => {
-                    if(payload.eventType === 'DELETE') {
-                        alert("Oda kapatıldı!");
-                        location.reload();
-                    } else if(payload.new) {
-                        updateUI(payload.new);
-                    }
-                })
-                .subscribe();
+                    if(payload.eventType === 'DELETE') { alert("Oda kapatıldı!"); location.reload(); }
+                    else if(payload.new) updateUI(payload.new);
+                }).subscribe();
         }
 
         function updateUI(room) {
             roomData = room;
 
-            let meStillHere = (room.players || []).find(p => p.name === myName);
-            if(!meStillHere) {
-                alert("Lider tarafından odadan atıldın!");
-                location.reload();
-                return;
-            }
+            let me = (room.players || []).find(p => p.name === myName);
+            if(!me) { alert("Odadan atıldın!"); location.reload(); return; }
 
             document.getElementById('phase').innerText = room.room_phase;
 
-            // Paneller Oyun Durumuna Göre Açılır/Kapanır
             if(room.room_phase === 'Oyun Bitti') {
                 document.getElementById('actionPanel').classList.add('hidden');
                 document.getElementById('votePanel').classList.add('hidden');
@@ -225,58 +206,48 @@
                 document.getElementById('votePanel').classList.add('hidden');
             }
 
-            // Oyuncu Listesi
+            if(me.team === 'Katil' && room.room_phase.includes('Gece')) {
+                document.getElementById('katilActionContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('katilActionContainer').classList.add('hidden');
+            }
+
             const container = document.getElementById('playersListContainer');
             container.innerHTML = '';
             (room.players || []).forEach(p => {
                 let row = document.createElement('div');
                 row.className = 'player-row';
                 row.innerHTML = `<span>${p.name} - <b style="color:${p.status === 'Ölü' ? '#ef4444' : '#10b981'}">${p.status || 'Yaşıyor'}</b></span>`;
-                
                 if(isLeader && p.name !== myName && room.room_phase === 'Bekliyor') {
                     let kickBtn = document.createElement('button');
-                    kickBtn.className = 'kick-btn';
-                    kickBtn.innerText = 'At';
-                    kickBtn.onclick = () => kickPlayer(p.name);
-                    row.appendChild(kickBtn);
+                    kickBtn.className = 'kick-btn'; kickBtn.innerText = 'At';
+                    kickBtn.onclick = () => kickPlayer(p.name); row.appendChild(kickBtn);
                 }
                 container.appendChild(row);
             });
 
-            // Kendi Rolüm
-            const me = (room.players || []).find(p => p.name === myName);
-            if(me && me.role) {
-                document.getElementById('myRole').innerText = me.role;
-            }
+            if(me.displayRole) document.getElementById('myRole').innerText = me.displayRole;
 
-            // Logları Birleştirme (Genel + Bana Özel)
             let combinedLogs = [...(room.logs || [])];
-            if(me && me.privateLogs) {
-                combinedLogs = combinedLogs.concat(me.privateLogs);
-            }
+            if(me.privateLogs) combinedLogs = combinedLogs.concat(me.privateLogs);
 
             const logDiv = document.getElementById('log');
             logDiv.innerHTML = combinedLogs.join('<br>') + '<br>';
             logDiv.scrollTop = logDiv.scrollHeight;
 
-            // Hedef Seçim Listeleri
             const targetSelect = document.getElementById('targetSelect');
-            targetSelect.innerHTML = '<option value="">Hedef Seç...</option><option value="HIÇBIR_ŞEY_YAPMA">Hiçbir Şey Yapma (Evde Kal)</option>';
+            targetSelect.innerHTML = '<option value="HIÇBIR_ŞEY_YAPMA">Hiçbir Şey Yapma (Evde Kal)</option>';
             
             const voteTargetSelect = document.getElementById('voteTargetSelect');
             voteTargetSelect.innerHTML = '<option value="BOŞ">Boş Oy At</option>';
 
             (room.players || []).forEach(p => {
+                if(p.status !== 'Ölü' && p.name !== myName) {
+                    let opt1 = document.createElement('option'); opt1.value = p.name; opt1.innerText = p.name;
+                    targetSelect.appendChild(opt1);
+                }
                 if(p.status !== 'Ölü') {
-                    if(p.name !== myName) {
-                        let opt = document.createElement('option');
-                        opt.value = p.name;
-                        opt.innerText = p.name;
-                        targetSelect.appendChild(opt);
-                    }
-                    let voteOpt = document.createElement('option');
-                    voteOpt.value = p.name;
-                    voteOpt.innerText = p.name;
+                    let voteOpt = document.createElement('option'); voteOpt.value = p.name; voteOpt.innerText = p.name;
                     voteTargetSelect.appendChild(voteOpt);
                 }
             });
@@ -285,8 +256,7 @@
         async function kickPlayer(targetName) {
             if(!isLeader) return;
             let updatedPlayers = roomData.players.filter(p => p.name !== targetName);
-            let logs = [...(roomData.logs || []), `${targetName} odadan atıldı.`];
-            await supabaseClient.from('rooms').update({ players: updatedPlayers, logs: logs }).eq('room_code', currentRoom);
+            await supabaseClient.from('rooms').update({ players: updatedPlayers }).eq('room_code', currentRoom);
         }
 
         async function startMatch() {
@@ -294,168 +264,235 @@
             let players = roomData.players || [];
             if(players.length === 0) return;
 
-            let baseRoles = ["Doktor", "Katil", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
-            let shuffledRoles = baseRoles.sort(() => 0.5 - Math.random());
+            let shuffledPlayers = [...players].sort(() => 0.5 - Math.random());
             
-            players.forEach((p, index) => {
-                p.role = shuffledRoles[index % shuffledRoles.length];
-                p.status = 'Yaşıyor';
-                p.privateLogs = [];
-                p.vote = null;
-            });
+            let katilRoles = ["Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör"];
+            let masumRoles = ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
 
-            let logs = ["Oyun başladı! Roller dağıtıldı, gece vakti."];
+            // 1 Kişiyi Kesin Katil Yap
+            let katilPlayer = shuffledPlayers[0];
+            katilPlayer.team = 'Katil';
+            katilPlayer.role = katilRoles[Math.floor(Math.random() * katilRoles.length)];
+            katilPlayer.displayRole = `Katil ${katilPlayer.role}`;
+            katilPlayer.status = 'Yaşıyor'; katilPlayer.privateLogs = []; katilPlayer.vote = null;
+
+            // Geri Kalanları Masum Yap
+            for(let i = 1; i < shuffledPlayers.length; i++) {
+                let p = shuffledPlayers[i];
+                p.team = 'Masum';
+                p.role = masumRoles[Math.floor(Math.random() * masumRoles.length)];
+                
+                if (p.role === 'Deli') {
+                    let fakeRoles = ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör"];
+                    p.displayRole = `Masum ${fakeRoles[Math.floor(Math.random() * fakeRoles.length)]}`;
+                } else {
+                    p.displayRole = `Masum ${p.role}`;
+                }
+                p.status = 'Yaşıyor'; p.privateLogs = []; p.vote = null;
+            }
 
             await supabaseClient.from('rooms').update({ 
                 room_phase: 'Gece (Aksiyon Zamanı)', 
-                players: players,
-                actions: {},
-                logs: logs
+                players: players, actions: {}, logs: ["Oyun başladı! Roller dağıtıldı, gece vakti."]
             }).eq('room_code', currentRoom);
         }
 
         async function submitAction() {
             const target = document.getElementById('targetSelect').value;
-            if(!target) {
-                alert("Lütfen bir hedef seç!");
-                return;
-            }
+            const actionType = document.getElementById('actionTypeSelect').value;
+            let me = roomData.players.find(p => p.name === myName);
+            if(!target) return alert("Lütfen bir hedef seç!");
+
             let actions = roomData.actions || {};
-            actions[myName] = target;
+            actions[myName] = { target: target, type: (me.team === 'Katil' ? actionType : 'role') };
 
             let logs = [...(roomData.logs || []), `${myName} aksiyonunu kullandı.`];
-
             await supabaseClient.from('rooms').update({ actions: actions, logs: logs }).eq('room_code', currentRoom);
             alert("Aksiyonun gönderildi!");
         }
 
-        // GECE MOTORU - TÜM ROLLER AKTİF
         async function resolveNight() {
             if(!isLeader) return;
             let players = roomData.players || [];
             let actions = roomData.actions || {};
             let nightLogs = [...(roomData.logs || []), "--- GECE SONUÇLANDI ---"];
 
-            // HER TUR BAŞINDA ESKİ GİZLİ MESAJLARI TEMİZLE
+            // Ekran temizliği
             players.forEach(p => p.privateLogs = []);
 
-            // Eylemleri toparla
-            let roleActions = {};
+            let intendedVisits = {};
             players.forEach(p => {
                 if(p.status === 'Ölü') return;
-                let target = actions[p.name];
-                if(!target || target === 'HIÇBIR_ŞEY_YAPMA') return;
-                roleActions[p.role] = { from: p.name, to: target };
+                let act = actions[p.name];
+                if(!act || act.target === 'HIÇBIR_ŞEY_YAPMA') return;
+                intendedVisits[p.name] = act;
             });
 
-            // 1. POLİS (Roleblocker) Aşaması
-            let blockedPlayers = [];
-            if (roleActions['Polis']) {
-                let blocked = roleActions['Polis'].to;
-                blockedPlayers.push(blocked);
-                
-                let cop = players.find(p => p.name === roleActions['Polis'].from);
-                cop.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${blocked} isimli oyuncunun evden çıkmasını engelledin.</span>`);
-                
-                let blockedVictim = players.find(p => p.name === blocked);
-                if(blockedVictim) {
-                    blockedVictim.privateLogs.push(`<span style="color:#f59e0b">[Gizli] Bu gece bir Polis tarafından engellendin! Hiçbir eylem yapamadın.</span>`);
-                }
-            }
-
-            // Engellenenleri filtrele
-            let finalActions = {};
+            // 1. TUZAKÇI VE POLİS HESAPLAMASI
+            let traps = {}; // Hangi evde kimin tuzağı var
             players.forEach(p => {
-                if (p.status === 'Ölü') return;
-                let target = actions[p.name];
-                if (!target || target === 'HIÇBIR_ŞEY_YAPMA' || blockedPlayers.includes(p.name)) return;
-                finalActions[p.name] = { role: p.role, to: target };
+                if(p.role === 'Tuzakçı' && intendedVisits[p.name]) {
+                    traps[intendedVisits[p.name].target] = p.name;
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${intendedVisits[p.name].target} evine tuzak kurdun.</span>`);
+                }
             });
 
-            // 2. KATİL VE DOKTOR AŞAMASI
-            let killerAction = Object.entries(finalActions).find(([n, d]) => d.role === 'Katil');
-            let doctorAction = Object.entries(finalActions).find(([n, d]) => d.role === 'Doktor');
-
-            if (killerAction) {
-                let killerName = killerAction[0];
-                let targetKilled = killerAction[1].to;
-                let isProtected = (doctorAction && doctorAction[1].to === targetKilled);
-
-                let killer = players.find(p => p.name === killerName);
-
-                if (isProtected) {
-                    let doc = players.find(p => p.name === doctorAction[0]);
-                    doc.privateLogs.push(`<span style="color:#10b981">[Gizli] Katilin hedefi olan ${targetKilled}'i başarıyla korudun!</span>`);
-
-                    let victim = players.find(p => p.name === targetKilled);
-                    victim.privateLogs.push(`<span style="color:#10b981">[Gizli] Gece katil sana saldırdı ancak bir Doktor seni kurtardı!</span>`);
-
-                    killer.privateLogs.push(`<span style="color:#ef4444">[Gizli] ${targetKilled}'e saldırdın ama bir Doktor onu korudu! Öldüremedin.</span>`);
-                } else {
-                    let victim = players.find(p => p.name === targetKilled);
-                    victim.status = 'Ölü';
-                    victim.privateLogs.push(`<span style="color:#ef4444">[Gizli] Gece Katil tarafından öldürüldün!</span>`);
+            let blockedPlayers = [];
+            
+            // Tuzağa Basanlar
+            Object.keys(intendedVisits).forEach(visitor => {
+                let dest = intendedVisits[visitor].target;
+                if(traps[dest] && traps[dest] !== visitor) {
+                    blockedPlayers.push(visitor);
+                    let vPlayer = players.find(x => x.name === visitor);
+                    if(vPlayer) vPlayer.privateLogs.push(`<span style="color:#f59e0b">[Gizli] Tuzağa bastın ve görevini yapamadın. Evine geri döndün!</span>`);
                     
-                    killer.privateLogs.push(`<span style="color:#10b981">[Gizli] ${targetKilled}'i başarıyla öldürdün.</span>`);
-                    nightLogs.push(`Katil dehşet saçtı! Bir kişi hayatını kaybetti.`);
+                    let tPlayer = players.find(x => x.name === traps[dest]);
+                    if(tPlayer) tPlayer.privateLogs.push(`<span style="color:#10b981">[Gizli] Kurduğun tuzağa birisi bastı!</span>`);
+                }
+            });
+
+            // Polis Engellemeleri
+            players.forEach(p => {
+                if(p.role === 'Polis' && intendedVisits[p.name] && !blockedPlayers.includes(p.name)) {
+                    let dest = intendedVisits[p.name].target;
+                    blockedPlayers.push(dest);
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${dest} oyuncusunu başarıyla engelledin.</span>`);
+                    let victim = players.find(x => x.name === dest);
+                    if(victim) victim.privateLogs.push(`<span style="color:#f59e0b">[Gizli] Bir Polis tarafından engellendin! Gece evden çıkamadın.</span>`);
+                }
+            });
+
+            let isBlocked = (name) => blockedPlayers.includes(name);
+
+            // 2. KATİL VE DOKTOR HESAPLAMASI
+            let doctorTarget = null;
+            let katilTarget = null;
+            let killerName = null;
+
+            players.forEach(p => {
+                if(isBlocked(p.name)) return;
+                let act = intendedVisits[p.name];
+                if(!act) return;
+
+                if(p.role === 'Doktor') doctorTarget = act.target;
+                if(p.team === 'Katil' && act.type === 'kill') { katilTarget = act.target; killerName = p.name; }
+            });
+
+            if(katilTarget) {
+                let victim = players.find(p => p.name === katilTarget);
+                let killer = players.find(p => p.name === killerName);
+                if(victim) {
+                    if(doctorTarget === katilTarget) {
+                        let doc = players.find(p => p.role === 'Doktor' && intendedVisits[p.name] && intendedVisits[p.name].target === doctorTarget);
+                        if(doc) doc.privateLogs.push(`<span style="color:#10b981">[Gizli] Katilin hedefi olan ${katilTarget}'i başarıyla korudun!</span>`);
+                        victim.privateLogs.push(`<span style="color:#10b981">[Gizli] Gece Katil saldırdı ancak bir Doktor seni kurtardı!</span>`);
+                        if(killer) killer.privateLogs.push(`<span style="color:#ef4444">[Gizli] Hedefine saldırdın ancak bir Doktor onu korudu! Öldüremedin.</span>`);
+                    } else {
+                        victim.status = 'Ölü';
+                        victim.privateLogs.push(`<span style="color:#ef4444">[Gizli] Gece Katil tarafından öldürüldün!</span>`);
+                        if(killer) killer.privateLogs.push(`<span style="color:#10b981">[Gizli] ${katilTarget}'i başarıyla öldürdün.</span>`);
+                        nightLogs.push(`Katil dehşet saçtı! Bir kişi hayatını kaybetti.`);
+                    }
                 }
             }
 
-            // 3. BİLGİ ROLLERİ AŞAMASI (İzci, Gözcü, Dedektif, İspiyoncu)
-            let scoutAction = Object.entries(finalActions).find(([n, d]) => d.role === 'İzci');
-            if(scoutAction) {
-                let scout = players.find(p => p.name === scoutAction[0]);
-                let targetName = scoutAction[1].to;
-                let targetDest = actions[targetName]; // İzlenen kişinin ham eylemi
+            // 3. BİLGİ ROLLERİ HESAPLAMASI
+            players.forEach(p => {
+                if(p.role === 'Deli' || isBlocked(p.name)) return;
+                let act = intendedVisits[p.name];
+                if(!act || act.type === 'kill') return;
+
+                let target = act.target;
+                let tPlayer = players.find(x => x.name === target);
                 
-                if(blockedPlayers.includes(targetName) || !targetDest || targetDest === 'HIÇBIR_ŞEY_YAPMA') {
-                    scout.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${targetName}, bu gece evden hiç çıkmadı.</span>`);
-                } else {
-                    scout.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${targetName}, bu gece ${targetDest} isimli kişinin evine gitti.</span>`);
+                if(p.role === 'İzci') {
+                    let tAct = intendedVisits[target];
+                    if(!tAct || isBlocked(target)) {
+                        p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${target}, bu gece evden hiç çıkmadı.</span>`);
+                    } else {
+                        p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${target}, bu gece ${tAct.target} isimli kişinin evine gitti.</span>`);
+                    }
                 }
-            }
-
-            let watcherAction = Object.entries(finalActions).find(([n, d]) => d.role === 'Gözcü');
-            if(watcherAction) {
-                let watcher = players.find(p => p.name === watcherAction[0]);
-                let targetName = watcherAction[1].to;
-                let visitors = [];
-                Object.entries(finalActions).forEach(([n, d]) => { if(d.to === targetName && n !== targetName) visitors.push(n); });
-                
-                if(visitors.length > 0) {
-                    watcher.privateLogs.push(`<span style="color:#38bdf8">[Gizli] Gözetlediğin ${targetName}'in evine bu gece ${visitors.length} kişi geldi.</span>`);
-                } else {
-                    watcher.privateLogs.push(`<span style="color:#38bdf8">[Gizli] Gözetlediğin ${targetName}'in evine bu gece kimse uğramadı.</span>`);
+                else if(p.role === 'Gözcü') {
+                    let visitors = [];
+                    Object.keys(intendedVisits).forEach(vName => {
+                        if(intendedVisits[vName].target === target && vName !== target && !isBlocked(vName)) {
+                            visitors.push(vName);
+                        }
+                    });
+                    if(visitors.length > 0) {
+                        p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target}'in evine bu gece ${visitors.length} kişi geldi: ${visitors.join(', ')}.</span>`);
+                    } else {
+                        p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target}'in evine bu gece kimse uğramadı.</span>`);
+                    }
                 }
-            }
+                else if(p.role === 'Dedektif') {
+                    let realStr = `${tPlayer.team} ${tPlayer.role}`;
+                    let oppTeam = tPlayer.team === 'Masum' ? 'Katil' : 'Masum';
+                    let pool = oppTeam === 'Katil' ? ["Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör"] : ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
+                    let fakeRole = pool[Math.floor(Math.random() * pool.length)];
+                    
+                    let arr = [realStr, `${oppTeam} ${fakeRole}`].sort(() => 0.5 - Math.random());
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} şu ikisinden biri: ${arr[0]} VEYA ${arr[1]}.</span>`);
+                }
+                else if(p.role === 'İspiyoncu') {
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İspiyonladın! ${target}'in kesin rolü: ${tPlayer.team} ${tPlayer.role}.</span>`);
+                }
+            });
 
-            let detAction = Object.entries(finalActions).find(([n, d]) => d.role === 'Dedektif');
-            if(detAction) {
-                let det = players.find(p => p.name === detAction[0]);
-                let targetPlayer = players.find(p => p.name === detAction[1].to);
-                let baseRoles = ["Doktor", "Katil", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
-                let wrongRoles = baseRoles.filter(r => r !== targetPlayer.role);
-                let randomWrong = wrongRoles[Math.floor(Math.random() * wrongRoles.length)];
-                let possible = [targetPlayer.role, randomWrong].sort(() => Math.random() - 0.5);
-                
-                det.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${targetPlayer.name} adlı kişinin rolü şunlardan biri: ${possible[0]} veya ${possible[1]}.</span>`);
-            }
+            // 4. DELİ'NİN (MADMAN) SAHTE BİLGİ DÜNYASI
+            players.forEach(p => {
+                if(p.role !== 'Deli') return;
+                let act = intendedVisits[p.name];
+                if(!act) return;
 
-            let snitchAction = Object.entries(finalActions).find(([n, d]) => d.role === 'İspiyoncu');
-            if(snitchAction) {
-                let snitch = players.find(p => p.name === snitchAction[0]);
-                let targetPlayer = players.find(p => p.name === snitchAction[1].to);
-                snitch.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İspiyonladın! ${targetPlayer.name} oyuncusunun kesin rolü: ${targetPlayer.role}.</span>`);
-            }
+                let fakeRole = p.displayRole.split(' ')[1]; 
+                let target = act.target;
+
+                if(fakeRole === 'Tuzakçı') {
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} evine tuzak kurdun.</span>`);
+                    if(Math.random() > 0.5) p.privateLogs.push(`<span style="color:#10b981">[Gizli] Kurduğun tuzağa birisi bastı!</span>`);
+                }
+                else if(fakeRole === 'Polis') {
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} oyuncusunu engelledin.</span>`);
+                }
+                else if(fakeRole === 'Doktor') {
+                    if(Math.random() > 0.7) p.privateLogs.push(`<span style="color:#10b981">[Gizli] Katilin hedefi olan ${target}'i başarıyla korudun!</span>`);
+                }
+                else if(fakeRole === 'İzci') {
+                    let others = players.filter(x => x.name !== target && x.name !== p.name);
+                    if(others.length > 0) {
+                        let randGo = others[Math.floor(Math.random() * others.length)].name;
+                        if(Math.random() > 0.5) p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${target}, bu gece evden hiç çıkmadı.</span>`);
+                        else p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${target}, bu gece ${randGo} isimli kişinin evine gitti.</span>`);
+                    }
+                }
+                else if(fakeRole === 'Gözcü') {
+                    let num = Math.floor(Math.random() * 3) + 1;
+                    let fakeV = [];
+                    let others = players.filter(x => x.name !== target && x.name !== p.name);
+                    for(let i=0; i<num; i++) {
+                        if(others.length > 0) fakeV.push(others[Math.floor(Math.random()*others.length)].name);
+                    }
+                    if(fakeV.length > 0) p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target}'in evine bu gece ${num} kişi geldi: ${fakeV.join(', ')}.</span>`);
+                    else p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target}'in evine bu gece kimse uğramadı.</span>`);
+                }
+                else if(fakeRole === 'Dedektif') {
+                    let r1 = `${Math.random()>0.5?'Masum':'Katil'} ${["Polis", "Gözcü", "İzci"][Math.floor(Math.random()*3)]}`;
+                    let r2 = `${Math.random()>0.5?'Masum':'Katil'} ${["Doktor", "Tuzakçı", "İspiyoncu"][Math.floor(Math.random()*3)]}`;
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} şu ikisinden biri: ${r1} VEYA ${r2}.</span>`);
+                }
+                else if(fakeRole === 'İspiyoncu') {
+                    let r = `${Math.random()>0.5?'Masum':'Katil'} ${["Polis", "Doktor", "Gözcü", "İzci"][Math.floor(Math.random()*4)]}`;
+                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İspiyonladın! ${target}'in kesin rolü: ${r}.</span>`);
+                }
+            });
 
             nightLogs.push("Sabah oldu! Lider oylamayı başlatabilir.");
 
             await supabaseClient.from('rooms').update({ 
-                room_phase: 'Gündüz (Oylama Vakti)', 
-                players: players,
-                actions: {},
-                votes: {},
-                logs: nightLogs
+                room_phase: 'Gündüz (Oylama Vakti)', players: players, actions: {}, votes: {}, logs: nightLogs
             }).eq('room_code', currentRoom);
         }
 
@@ -464,7 +501,6 @@
             let players = roomData.players;
             let me = players.find(p => p.name === myName);
             if(me) me.vote = target;
-
             await supabaseClient.from('rooms').update({ players: players }).eq('room_code', currentRoom);
             alert("Oyun kaydedildi!");
         }
@@ -474,13 +510,10 @@
             let players = roomData.players || [];
             let voteCounts = {};
 
-            // Oylama başında da eski gizli logları temizle ki ekran ferahlasın
             players.forEach(p => p.privateLogs = []);
 
             players.forEach(p => {
-                if(p.vote && p.vote !== 'BOŞ') {
-                    voteCounts[p.vote] = (voteCounts[p.vote] || 0) + 1;
-                }
+                if(p.vote && p.vote !== 'BOŞ') voteCounts[p.vote] = (voteCounts[p.vote] || 0) + 1;
             });
 
             let livingCount = players.filter(p => p.status === 'Yaşıyor').length;
@@ -488,10 +521,7 @@
             let executed = null;
 
             for (let [target, count] of Object.entries(voteCounts)) {
-                if (count >= majorityNeeded) {
-                    executed = target;
-                    break;
-                }
+                if (count >= majorityNeeded) { executed = target; break; }
             }
 
             let dayLogs = [...(roomData.logs || []), "--- OYLAMA SONUCU ---"];
@@ -501,10 +531,9 @@
                 let victim = players.find(p => p.name === executed);
                 if (victim) {
                     victim.status = 'Ölü';
-                    dayLogs.push(`${executed} çoğunluğun oyuyla idam edildi! Rolü: ${victim.role}`);
+                    dayLogs.push(`${executed} çoğunluğun oyuyla idam edildi! Rolü: ${victim.team} ${victim.role}`);
                     
-                    // OYUN BİTİŞ KONTROLÜ (KATİL ASILIRSA)
-                    if(victim.role === 'Katil') {
+                    if(victim.team === 'Katil') {
                         dayLogs.push("<b style='color:#10b981; font-size:1.1rem;'>🎉 KATİL İDAM EDİLDİ! OYUN BİTTİ! MASUMLAR KAZANDI! 🎉</b>");
                         newPhase = 'Oyun Bitti';
                     }
@@ -513,13 +542,11 @@
                 dayLogs.push("Yeterli çoğunluk sağlanamadığı için kimse idam edilmedi.");
             }
 
-            players.forEach(p => p.vote = null); // Oyları sıfırla
+            players.forEach(p => p.vote = null);
             if(newPhase !== 'Oyun Bitti') dayLogs.push("Gece vakti tekrar başlıyor...");
 
             await supabaseClient.from('rooms').update({ 
-                room_phase: newPhase, 
-                players: players,
-                logs: dayLogs
+                room_phase: newPhase, players: players, logs: dayLogs
             }).eq('room_code', currentRoom);
         }
 
@@ -529,11 +556,8 @@
                     await supabaseClient.from('rooms').delete().eq('room_code', currentRoom);
                     location.reload();
                 }
-            } else {
-                location.reload();
-            }
+            } else { location.reload(); }
         }
     </script>
-
 </body>
 </html>
