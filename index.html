@@ -65,7 +65,8 @@
 
     <script>
         const SUPABASE_URL = 'https://sulphxhrguiahelilyww.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_oq0SA8um6Bept5CJ6srO0W_LMQuvdEF';
+        // Supabase panelindeki klasik 'anon public' (eyJ ile başlayan) anahtarını buraya yazıyoruz:
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeGhyZ3VpYWhlbGlseXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MzU5MDIsImV4cCI6MjEwMzMxMTkwMn0.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
