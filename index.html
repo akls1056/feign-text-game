@@ -8,44 +8,91 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
         h1 { font-size: 1.5rem; text-align: center; color: #38bdf8; }
         .card { background: #1e293b; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        #log { height: 200px; overflow-y: scroll; background: #090d16; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px; }
-        select, button, input { width: 100%; padding: 12px; margin-top: 8px; border-radius: 8px; border: none; font-size: 1rem; }
+        #log { height: 180px; overflow-y: scroll; background: #090d16; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px; }
+        select, button, input { width: 100%; padding: 12px; margin-top: 8px; border-radius: 8px; border: none; font-size: 1rem; box-sizing: border-box; }
         select, input { background: #334155; color: white; }
         button { background: #0ea5e9; color: white; font-weight: bold; cursor: pointer; }
         button:active { background: #0284c7; }
-        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; background: #334155; }
+        .hidden { display: none !important; }
+        .danger-btn { background: #ef4444 !important; }
+        .danger-btn:active { background: #dc2626 !important; }
+        .player-list { font-size: 0.9rem; color: #94a3b8; margin-top: 5px; }
     </style>
 </head>
 <body>
 
     <h1>Mobil Feign</h1>
-    
-    <div class="card">
-        <div>Oda Durumu: <span id="phase" class="status-badge">Bekliyor...</span></div>
-        <div id="playerInfo" style="margin-top: 5px; font-weight: bold;">Rolün: Henüz atanmadı</div>
+
+    <!-- İSİM GİRİŞ EKRANI -->
+    <div id="loginScreen" class="card">
+        <h3>Oyuna Katıl</h3>
+        <p style="font-size: 0.9rem; color: #94a3b8;">Lütfen adını gir ve oyuna dahil ol.</p>
+        <input type="text" id="playerNameInput" placeholder="Adın (Örn: Ahmet)..." maxlength="15">
+        <button onclick="joinGame()">Odaya Gir</button>
     </div>
 
-    <div class="card">
-        <h3>Oyun Günlüğü</h3>
-        <div id="log">Sistem başlatıldı. Oyuncuların katılması bekleniyor...<br></div>
-    </div>
+    <!-- OYUN EKRANI (Başta gizli, isim girilince açılacak) -->
+    <div id="gameScreen" class="hidden">
+        <div class="card">
+            <div>Oda Durumu: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor...</span></div>
+            <div id="playerInfo" style="margin-top: 5px; font-weight: bold;">Rolün: Henüz atanmadı</div>
+            <div class="player-list" id="playerListText">Odadakiler: Kimse yok</div>
+        </div>
 
-    <div class="card" id="actionPanel">
-        <h3>Gece Aksiyonu / Seçim</h3>
-        <p style="font-size: 0.9rem; color: #94a3b8;">Hedefini seç ve aksiyonunu onayla.</p>
-        <select id="targetSelect">
-            <option value="">Hedef Seç...</option>
-        </select>
-        <button onclick="submitAction()">Aksiyonu Gönder</button>
+        <div class="card">
+            <h3>Oyun Günlüğü</h3>
+            <div id="log">Sisteme hoş geldin!<br></div>
+        </div>
+
+        <div class="card" id="actionPanel">
+            <h3>Gece Aksiyonu / Seçim</h3>
+            <select id="targetSelect">
+                <option value="">Hedef Seç...</option>
+            </select>
+            <button onclick="submitAction()">Aksiyonu Gönder</button>
+        </div>
+
+        <!-- SADECE LİDERİN GÖRECEĞİ PANEL -->
+        <div id="leaderPanel" class="card hidden" style="border: 2px dashed #f59e0b;">
+            <h3 style="color: #f59e0b; margin-top:0;">Lider Paneli</h3>
+            <button onclick="startMatch()">Oyunu Başlat (7 Kişi Olunca)</button>
+            <button class="danger-btn" onclick="resetGame()">Oyunu Sıfırla</button>
+        </div>
     </div>
 
     <script>
-        // Şimdilik arayüz iskeleti. Supabase/Realtime entegrasyonu ile 
-        // buraya 7 kişinin anlık veri alışverişini bağlayacağız.
+        let myName = "";
+        let isLeader = false;
+
         function logMessage(msg) {
             const log = document.getElementById('log');
             log.innerHTML += `> ${msg}<br>`;
             log.scrollTop = log.scrollHeight;
+        }
+
+        function joinGame() {
+            const nameInput = document.getElementById('playerNameInput').value.trim();
+            if(!nameInput) {
+                alert("Lütfen geçerli bir isim yaz!");
+                return;
+            }
+            myName = nameInput;
+            
+            // Ekranları değiştir
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            
+            logMessage(`${myName} odaya katıldı.`);
+            
+            // Şimdilik test amaçlı ilk giren kişiyi lider yapalım 
+            // (İleride Supabase'e ilk bağlanan kayıt olacak)
+            setAsLeader();
+        }
+
+        function setAsLeader() {
+            isLeader = true;
+            document.getElementById('leaderPanel').classList.remove('hidden');
+            logMessage("Odanın lideri sensin! Herkes toplandığında oyunu başlatabilirsin.");
         }
 
         function submitAction() {
@@ -55,6 +102,19 @@
                 return;
             }
             logMessage(`Aksiyon gönderildi: ${target}`);
+        }
+
+        function startMatch() {
+            if(!isLeader) return;
+            logMessage("Lider oyunu başlattı! Roller dağıtılıyor...");
+            document.getElementById('phase').innerText = "Gece (Aksiyon Zamanı)";
+        }
+
+        function resetGame() {
+            if(!isLeader) return;
+            if(confirm("Oyunu sıfırlamak istediğine emin misin?")) {
+                location.reload();
+            }
         }
     </script>
 
