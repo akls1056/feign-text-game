@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobil Feign - Realtime</title>
-    <!-- Supabase Kütüphanesi -->
+    <title>Mobil Feign - Rol Dağıtımı</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
@@ -19,13 +18,13 @@
         .danger-btn { background: #ef4444 !important; }
         .danger-btn:active { background: #dc2626 !important; }
         .player-list { font-size: 0.9rem; color: #94a3b8; margin-top: 5px; }
+        .role-badge { display: inline-block; padding: 6px 12px; border-radius: 6px; font-weight: bold; background: #38bdf8; color: #0f172a; margin-top: 5px; }
     </style>
 </head>
 <body>
 
     <h1>Mobil Feign</h1>
 
-    <!-- GİRİŞ EKRANI -->
     <div id="loginScreen" class="card">
         <h3>Oyuna Katıl</h3>
         <input type="text" id="playerNameInput" placeholder="Adın (Örn: Ahmet)..." maxlength="15">
@@ -37,17 +36,16 @@
         <button onclick="joinGame()" style="margin-top: 15px;">Odaya Gir</button>
     </div>
 
-    <!-- OYUN EKRANI -->
     <div id="gameScreen" class="hidden">
         <div class="card">
-            <div>Oda Durumu: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor...</span></div>
-            <div id="playerInfo" style="margin-top: 5px; font-weight: bold;">Rolün: Henüz atanmadı</div>
-            <div class="player-list" id="playerListText">Odadakiler: Yükleniyor...</div>
+            <div>Oda Durumu: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor</span></div>
+            <div id="playerInfo" style="margin-top: 8px;">Rolün: <span id="myRole" class="role-badge">Henüz atanmadı</span></div>
+            <div class="player-list" id="playerListText" style="margin-top: 10px;">Odadakiler: Yükleniyor...</div>
         </div>
 
         <div class="card">
             <h3>Oyun Günlüğü</h3>
-            <div id="log">Sisteme bağlandı.<br></div>
+            <div id="log">Sisteme bağlanıldı.<br></div>
         </div>
 
         <div class="card" id="actionPanel">
@@ -58,18 +56,16 @@
             <button onclick="submitAction()">Aksiyonu Gönder</button>
         </div>
 
-        <!-- SADECE LİDERİN PANELİ -->
         <div id="leaderPanel" class="card hidden" style="border: 2px dashed #f59e0b;">
             <h3 style="color: #f59e0b; margin-top:0;">Lider Paneli</h3>
-            <button onclick="startMatch()">Oyunu Başlat</button>
+            <button onclick="startMatch()">Oyunu Başlat & Rolleri Dağıt</button>
             <button class="danger-btn" onclick="resetGame()">Oyunu Sıfırla</button>
         </div>
     </div>
 
     <script>
-        // SUPABASE BAĞLANTI BİLGİLERİNİ BURAYA YAPIŞTIRACAKSIN:
         const SUPABASE_URL = 'https://sulphxhrguiahelilyww.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_oq0SA8um6Bept5CJ6srOOw_LMQuvdEF';
+        const SUPABASE_KEY = 'sb_publishable_oq0SA8um6Bept5CJ6srO0W_LMQuvdEF';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -94,28 +90,31 @@
             myName = nameInput;
             isLeader = (roleInput === 'leader');
 
-            // Veritabanından mevcut durumu çek
-            let { data } = await supabaseClient.from('game_state').select('*').eq('id', 1).single();
-            if(data) {
+            try {
+                let { data, error } = await supabaseClient.from('game_state').select('*').eq('id', 1).single();
+                if (error) throw error;
+
                 let currentPlayers = data.players || [];
                 if(!currentPlayers.find(p => p.name === myName)) {
                     currentPlayers.push({ name: myName, role: 'Atanmadı' });
                     await supabaseClient.from('game_state').update({ players: currentPlayers }).eq('id', 1);
                 }
+
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('gameScreen').classList.remove('hidden');
+
+                if(isLeader) {
+                    document.getElementById('leaderPanel').classList.remove('hidden');
+                    logMessage(`${myName} odaya Lider olarak girdi.`);
+                } else {
+                    logMessage(`${myName} odaya Oyuncu olarak girdi.`);
+                }
+
+                subRealtime();
+                fetchState();
+            } catch (err) {
+                alert("Bağlantı Hatası: " + err.message);
             }
-
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('gameScreen').classList.remove('hidden');
-
-            if(isLeader) {
-                document.getElementById('leaderPanel').classList.remove('hidden');
-                logMessage(`${myName} odaya Lider olarak girdi.`);
-            } else {
-                logMessage(`${myName} odaya Oyuncu olarak girdi.`);
-            }
-
-            subRealtime();
-            fetchState();
         }
 
         async function fetchState() {
@@ -136,14 +135,17 @@
             gameState = state;
             document.getElementById('phase').innerText = state.room_phase;
 
-            // Oyuncu listesini güncelle
-            const pList = state.players.map(p => p.name).join(', ');
+            const pList = (state.players || []).map(p => p.name).join(', ');
             document.getElementById('playerListText').innerText = `Odadakiler: ${pList || 'Kimse yok'}`;
 
-            // Hedef seçme kutusunu güncelle (kendisi hariç diğer oyuncular)
+            const me = (state.players || []).find(p => p.name === myName);
+            if(me && me.role) {
+                document.getElementById('myRole').innerText = me.role;
+            }
+
             const targetSelect = document.getElementById('targetSelect');
             targetSelect.innerHTML = '<option value="">Hedef Seç...</option>';
-            state.players.forEach(p => {
+            (state.players || []).forEach(p => {
                 if(p.name !== myName) {
                     let opt = document.createElement('option');
                     opt.value = p.name;
@@ -151,6 +153,29 @@
                     targetSelect.appendChild(opt);
                 }
             });
+        }
+
+        async function startMatch() {
+            if(!isLeader) return;
+            let players = gameState.players || [];
+            if(players.length === 0) {
+                alert("Odada hiç oyuncu yok!");
+                return;
+            }
+
+            let baseRoles = ["Doktor", "Katil", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
+            let shuffledRoles = baseRoles.sort(() => 0.5 - Math.random());
+            
+            players.forEach((p, index) => {
+                p.role = shuffledRoles[index % shuffledRoles.length];
+            });
+
+            await supabaseClient.from('game_state').update({ 
+                room_phase: 'Gece (Aksiyon Zamanı)', 
+                players: players 
+            }).eq('id', 1);
+
+            logMessage("Lider oyunu başlattı ve roller dağıtıldı!");
         }
 
         async function submitAction() {
@@ -164,12 +189,6 @@
 
             await supabaseClient.from('game_state').update({ actions: actions }).eq('id', 1);
             logMessage(`Seçimin kaydedildi: ${target}`);
-        }
-
-        async function startMatch() {
-            if(!isLeader) return;
-            await supabaseClient.from('game_state').update({ room_phase: 'Gece (Aksiyon Zamanı)' }).eq('id', 1);
-            logMessage("Lider oyunu başlattı!");
         }
 
         async function resetGame() {
