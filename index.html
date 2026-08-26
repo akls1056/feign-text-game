@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobil Feign - Tam Sürüm</title>
+    <title>Mobil Feign - Wiki Rules Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
@@ -46,7 +46,7 @@
     <div id="gameScreen" class="hidden">
         <div class="card">
             <div>Oda: <span id="currentRoomTitle" style="color: #38bdf8; font-weight: bold;">-</span> | Durum: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor</span></div>
-            <div id="playerInfo" style="margin-top: 8px;">Rolün: <span id="myRole" class="role-badge">Henüz atanmadı</span></div>
+            <div id="playerInfo" style="margin-top: 8px;">Takım ve Rolün: <span id="myRole" class="role-badge">Henüz atanmadı</span></div>
             <div style="margin-top: 12px; font-weight: bold; color: #94a3b8;">Odadaki Oyuncular:</div>
             <div id="playersListContainer" style="margin-top: 5px;"></div>
         </div>
@@ -56,10 +56,9 @@
             <div id="log">Odaya hoş geldin!<br></div>
         </div>
 
-        <!-- GECE AKSİYON PANELİ -->
         <div class="card" id="actionPanel">
             <h3>Gece Aksiyonu</h3>
-            <label style="font-size: 0.9rem; color: #94a3b8;">Hedef:</label>
+            <label style="font-size: 0.9rem; color: #94a3b8;">Hedef (Seçtiğin kişiye gidersin):</label>
             <select id="targetSelect">
                 <option value="">Hedef Seç...</option>
             </select>
@@ -75,7 +74,6 @@
             <button onclick="submitAction()" style="margin-top: 15px;">Aksiyonu Gönder</button>
         </div>
 
-        <!-- GÜNDÜZ OYLAMA PANELİ -->
         <div class="card hidden" id="votePanel">
             <h3>Gündüz Oylaması (İdam)</h3>
             <select id="voteTargetSelect">
@@ -104,26 +102,14 @@
         let isLeader = false;
         let roomData = null;
 
-        function logMessage(msg) {
-            const log = document.getElementById('log');
-            log.innerHTML += `> ${msg}<br>`;
-            log.scrollTop = log.scrollHeight;
-        }
-
         async function createRoom() {
             myName = document.getElementById('playerNameInput').value.trim();
             currentRoom = document.getElementById('newRoomCodeInput').value.trim().toUpperCase();
 
-            if(!myName || !currentRoom) {
-                alert("Lütfen adını ve bir oda kodu yaz!");
-                return;
-            }
+            if(!myName || !currentRoom) return alert("Lütfen adını ve bir oda kodu yaz!");
 
             let { data: existing } = await supabaseClient.from('rooms').select('*').eq('room_code', currentRoom).single();
-            if(existing) {
-                alert("Bu oda kodu zaten kullanımda!");
-                return;
-            }
+            if(existing) return alert("Bu oda kodu zaten kullanımda!");
 
             isLeader = true;
             let newPlayers = [{ name: myName, role: 'Lider', team: 'Lider', displayRole: 'Lider', status: 'Yaşıyor', privateLogs: [], vote: null }];
@@ -163,10 +149,8 @@
             document.getElementById('lobbyScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
             document.getElementById('currentRoomTitle').innerText = currentRoom;
-
             if(isLeader) document.getElementById('leaderPanel').classList.remove('hidden');
             else document.getElementById('leaderPanel').classList.add('hidden');
-
             subRealtime();
             fetchRoomState();
         }
@@ -186,7 +170,6 @@
 
         function updateUI(room) {
             roomData = room;
-
             let me = (room.players || []).find(p => p.name === myName);
             if(!me) { alert("Odadan atıldın!"); location.reload(); return; }
 
@@ -230,7 +213,6 @@
 
             let combinedLogs = [...(room.logs || [])];
             if(me.privateLogs) combinedLogs = combinedLogs.concat(me.privateLogs);
-
             const logDiv = document.getElementById('log');
             logDiv.innerHTML = combinedLogs.join('<br>') + '<br>';
             logDiv.scrollTop = logDiv.scrollHeight;
@@ -266,8 +248,9 @@
 
             let shuffledPlayers = [...players].sort(() => 0.5 - Math.random());
             
-            let katilRoles = ["Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör"];
-            let masumRoles = ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
+            // Deli ve Provokatör yok!
+            let katilRoles = ["Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu"];
+            let masumRoles = ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu"];
 
             // 1 Kişiyi Kesin Katil Yap
             let katilPlayer = shuffledPlayers[0];
@@ -281,13 +264,7 @@
                 let p = shuffledPlayers[i];
                 p.team = 'Masum';
                 p.role = masumRoles[Math.floor(Math.random() * masumRoles.length)];
-                
-                if (p.role === 'Deli') {
-                    let fakeRoles = ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör"];
-                    p.displayRole = `Masum ${fakeRoles[Math.floor(Math.random() * fakeRoles.length)]}`;
-                } else {
-                    p.displayRole = `Masum ${p.role}`;
-                }
+                p.displayRole = `Masum ${p.role}`;
                 p.status = 'Yaşıyor'; p.privateLogs = []; p.vote = null;
             }
 
@@ -301,10 +278,11 @@
             const target = document.getElementById('targetSelect').value;
             const actionType = document.getElementById('actionTypeSelect').value;
             let me = roomData.players.find(p => p.name === myName);
-            if(!target) return alert("Lütfen bir hedef seç!");
-
+            
             let actions = roomData.actions || {};
-            actions[myName] = { target: target, type: (me.team === 'Katil' ? actionType : 'role') };
+            // Katil değilse her türlü rolünü kullanır.
+            let resolvedType = (me.team === 'Katil') ? actionType : 'role';
+            actions[myName] = { target: target, type: resolvedType };
 
             let logs = [...(roomData.logs || []), `${myName} aksiyonunu kullandı.`];
             await supabaseClient.from('rooms').update({ actions: actions, logs: logs }).eq('room_code', currentRoom);
@@ -328,31 +306,44 @@
                 intendedVisits[p.name] = act;
             });
 
-            // 1. TUZAKÇI VE POLİS HESAPLAMASI
-            let traps = {}; // Hangi evde kimin tuzağı var
+            let blockedPlayers = [];
+
+            // 1. TUZAKÇI HESAPLAMASI (Sadece ilk gelen basar)
+            let trappedHouses = {};
             players.forEach(p => {
                 if(p.role === 'Tuzakçı' && intendedVisits[p.name]) {
-                    traps[intendedVisits[p.name].target] = p.name;
+                    trappedHouses[intendedVisits[p.name].target] = p.name;
                     p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${intendedVisits[p.name].target} evine tuzak kurdun.</span>`);
                 }
             });
 
-            let blockedPlayers = [];
-            
-            // Tuzağa Basanlar
-            Object.keys(intendedVisits).forEach(visitor => {
-                let dest = intendedVisits[visitor].target;
-                if(traps[dest] && traps[dest] !== visitor) {
-                    blockedPlayers.push(visitor);
-                    let vPlayer = players.find(x => x.name === visitor);
+            // Evlere gelenleri topla
+            let visitorsToHouse = {};
+            Object.keys(intendedVisits).forEach(visitorName => {
+                let dest = intendedVisits[visitorName].target;
+                if(!visitorsToHouse[dest]) visitorsToHouse[dest] = [];
+                visitorsToHouse[dest].push(visitorName);
+            });
+
+            Object.keys(trappedHouses).forEach(house => {
+                let trapperName = trappedHouses[house];
+                let visitors = visitorsToHouse[house] || [];
+                let validVisitors = visitors.filter(v => v !== trapperName); // Kendisi basmaz
+                
+                if(validVisitors.length > 0) {
+                    // İlk gelen (rastgele) 1 kişi tuzağa basar
+                    let trappedPerson = validVisitors[Math.floor(Math.random() * validVisitors.length)];
+                    blockedPlayers.push(trappedPerson);
+                    
+                    let vPlayer = players.find(x => x.name === trappedPerson);
                     if(vPlayer) vPlayer.privateLogs.push(`<span style="color:#f59e0b">[Gizli] Tuzağa bastın ve görevini yapamadın. Evine geri döndün!</span>`);
                     
-                    let tPlayer = players.find(x => x.name === traps[dest]);
+                    let tPlayer = players.find(x => x.name === trapperName);
                     if(tPlayer) tPlayer.privateLogs.push(`<span style="color:#10b981">[Gizli] Kurduğun tuzağa birisi bastı!</span>`);
                 }
             });
 
-            // Polis Engellemeleri
+            // 2. POLİS HESAPLAMASI
             players.forEach(p => {
                 if(p.role === 'Polis' && intendedVisits[p.name] && !blockedPlayers.includes(p.name)) {
                     let dest = intendedVisits[p.name].target;
@@ -365,47 +356,58 @@
 
             let isBlocked = (name) => blockedPlayers.includes(name);
 
-            // 2. KATİL VE DOKTOR HESAPLAMASI
-            let doctorTarget = null;
-            let katilTarget = null;
-            let killerName = null;
+            // 3. KATİL VE DOKTOR HESAPLAMASI (Güvenli Kontrol)
+            let doctors = [];
+            let killers = [];
 
             players.forEach(p => {
                 if(isBlocked(p.name)) return;
                 let act = intendedVisits[p.name];
                 if(!act) return;
 
-                if(p.role === 'Doktor') doctorTarget = act.target;
-                if(p.team === 'Katil' && act.type === 'kill') { katilTarget = act.target; killerName = p.name; }
+                if(p.role === 'Doktor') doctors.push({ from: p.name, to: act.target });
+                if(p.team === 'Katil' && act.type === 'kill') killers.push({ from: p.name, to: act.target });
             });
 
-            if(katilTarget) {
-                let victim = players.find(p => p.name === katilTarget);
-                let killer = players.find(p => p.name === killerName);
-                if(victim) {
-                    if(doctorTarget === katilTarget) {
-                        let doc = players.find(p => p.role === 'Doktor' && intendedVisits[p.name] && intendedVisits[p.name].target === doctorTarget);
-                        if(doc) doc.privateLogs.push(`<span style="color:#10b981">[Gizli] Katilin hedefi olan ${katilTarget}'i başarıyla korudun!</span>`);
-                        victim.privateLogs.push(`<span style="color:#10b981">[Gizli] Gece Katil saldırdı ancak bir Doktor seni kurtardı!</span>`);
-                        if(killer) killer.privateLogs.push(`<span style="color:#ef4444">[Gizli] Hedefine saldırdın ancak bir Doktor onu korudu! Öldüremedin.</span>`);
+            let protectedPlayers = doctors.map(d => d.to);
+
+            // Doktorlara Korumayı Bildir
+            doctors.forEach(doc => {
+                let docPlayer = players.find(p => p.name === doc.from);
+                let attacked = killers.find(k => k.to === doc.to);
+                if(attacked && docPlayer) {
+                    docPlayer.privateLogs.push(`<span style="color:#10b981">[Gizli] Katilin hedefi olan ${doc.to}'i başarıyla korudun!</span>`);
+                }
+            });
+
+            // Katilin Saldırısını Bildir
+            killers.forEach(killer => {
+                let killerPlayer = players.find(p => p.name === killer.from);
+                let victimPlayer = players.find(p => p.name === killer.to);
+                
+                if(victimPlayer) {
+                    if(protectedPlayers.includes(killer.to)) {
+                        if(killerPlayer) killerPlayer.privateLogs.push(`<span style="color:#ef4444">[Gizli] Hedefine saldırdın ancak bir Doktor onu korudu! Öldüremedin.</span>`);
+                        victimPlayer.privateLogs.push(`<span style="color:#10b981">[Gizli] Gece Katil sana saldırdı ancak bir Doktor seni kurtardı!</span>`);
                     } else {
-                        victim.status = 'Ölü';
-                        victim.privateLogs.push(`<span style="color:#ef4444">[Gizli] Gece Katil tarafından öldürüldün!</span>`);
-                        if(killer) killer.privateLogs.push(`<span style="color:#10b981">[Gizli] ${katilTarget}'i başarıyla öldürdün.</span>`);
+                        victimPlayer.status = 'Ölü';
+                        victimPlayer.privateLogs.push(`<span style="color:#ef4444">[Gizli] Gece Katil tarafından öldürüldün!</span>`);
+                        if(killerPlayer) killerPlayer.privateLogs.push(`<span style="color:#10b981">[Gizli] ${killer.to}'i başarıyla öldürdün.</span>`);
                         nightLogs.push(`Katil dehşet saçtı! Bir kişi hayatını kaybetti.`);
                     }
                 }
-            }
+            });
 
-            // 3. BİLGİ ROLLERİ HESAPLAMASI
+            // 4. BİLGİ ROLLERİ HESAPLAMASI
             players.forEach(p => {
-                if(p.role === 'Deli' || isBlocked(p.name)) return;
+                if(isBlocked(p.name)) return;
                 let act = intendedVisits[p.name];
                 if(!act || act.type === 'kill') return;
 
                 let target = act.target;
                 let tPlayer = players.find(x => x.name === target);
-                
+                if(!tPlayer) return;
+
                 if(p.role === 'İzci') {
                     let tAct = intendedVisits[target];
                     if(!tAct || isBlocked(target)) {
@@ -430,62 +432,13 @@
                 else if(p.role === 'Dedektif') {
                     let realStr = `${tPlayer.team} ${tPlayer.role}`;
                     let oppTeam = tPlayer.team === 'Masum' ? 'Katil' : 'Masum';
-                    let pool = oppTeam === 'Katil' ? ["Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör"] : ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu", "Provokatör", "Deli"];
+                    let pool = oppTeam === 'Katil' ? ["Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu"] : ["Doktor", "Polis", "Gözcü", "İzci", "Dedektif", "Tuzakçı", "İspiyoncu"];
                     let fakeRole = pool[Math.floor(Math.random() * pool.length)];
-                    
                     let arr = [realStr, `${oppTeam} ${fakeRole}`].sort(() => 0.5 - Math.random());
                     p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} şu ikisinden biri: ${arr[0]} VEYA ${arr[1]}.</span>`);
                 }
                 else if(p.role === 'İspiyoncu') {
                     p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İspiyonladın! ${target}'in kesin rolü: ${tPlayer.team} ${tPlayer.role}.</span>`);
-                }
-            });
-
-            // 4. DELİ'NİN (MADMAN) SAHTE BİLGİ DÜNYASI
-            players.forEach(p => {
-                if(p.role !== 'Deli') return;
-                let act = intendedVisits[p.name];
-                if(!act) return;
-
-                let fakeRole = p.displayRole.split(' ')[1]; 
-                let target = act.target;
-
-                if(fakeRole === 'Tuzakçı') {
-                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} evine tuzak kurdun.</span>`);
-                    if(Math.random() > 0.5) p.privateLogs.push(`<span style="color:#10b981">[Gizli] Kurduğun tuzağa birisi bastı!</span>`);
-                }
-                else if(fakeRole === 'Polis') {
-                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} oyuncusunu engelledin.</span>`);
-                }
-                else if(fakeRole === 'Doktor') {
-                    if(Math.random() > 0.7) p.privateLogs.push(`<span style="color:#10b981">[Gizli] Katilin hedefi olan ${target}'i başarıyla korudun!</span>`);
-                }
-                else if(fakeRole === 'İzci') {
-                    let others = players.filter(x => x.name !== target && x.name !== p.name);
-                    if(others.length > 0) {
-                        let randGo = others[Math.floor(Math.random() * others.length)].name;
-                        if(Math.random() > 0.5) p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${target}, bu gece evden hiç çıkmadı.</span>`);
-                        else p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İzlediğin ${target}, bu gece ${randGo} isimli kişinin evine gitti.</span>`);
-                    }
-                }
-                else if(fakeRole === 'Gözcü') {
-                    let num = Math.floor(Math.random() * 3) + 1;
-                    let fakeV = [];
-                    let others = players.filter(x => x.name !== target && x.name !== p.name);
-                    for(let i=0; i<num; i++) {
-                        if(others.length > 0) fakeV.push(others[Math.floor(Math.random()*others.length)].name);
-                    }
-                    if(fakeV.length > 0) p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target}'in evine bu gece ${num} kişi geldi: ${fakeV.join(', ')}.</span>`);
-                    else p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target}'in evine bu gece kimse uğramadı.</span>`);
-                }
-                else if(fakeRole === 'Dedektif') {
-                    let r1 = `${Math.random()>0.5?'Masum':'Katil'} ${["Polis", "Gözcü", "İzci"][Math.floor(Math.random()*3)]}`;
-                    let r2 = `${Math.random()>0.5?'Masum':'Katil'} ${["Doktor", "Tuzakçı", "İspiyoncu"][Math.floor(Math.random()*3)]}`;
-                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] ${target} şu ikisinden biri: ${r1} VEYA ${r2}.</span>`);
-                }
-                else if(fakeRole === 'İspiyoncu') {
-                    let r = `${Math.random()>0.5?'Masum':'Katil'} ${["Polis", "Doktor", "Gözcü", "İzci"][Math.floor(Math.random()*4)]}`;
-                    p.privateLogs.push(`<span style="color:#38bdf8">[Gizli] İspiyonladın! ${target}'in kesin rolü: ${r}.</span>`);
                 }
             });
 
