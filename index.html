@@ -23,15 +23,22 @@
 
     <h1>Mobil Feign</h1>
 
-    <!-- İSİM GİRİŞ EKRANI -->
+    <!-- İSİM VE ROL SEÇİM EKRANI -->
     <div id="loginScreen" class="card">
         <h3>Oyuna Katıl</h3>
-        <p style="font-size: 0.9rem; color: #94a3b8;">Lütfen adını gir ve oyuna dahil ol.</p>
+        <p style="font-size: 0.9rem; color: #94a3b8;">Adını gir ve oda içindeki rolünü seç.</p>
         <input type="text" id="playerNameInput" placeholder="Adın (Örn: Ahmet)..." maxlength="15">
-        <button onclick="joinGame()">Odaya Gir</button>
+        
+        <label style="font-size: 0.9rem; color: #94a3b8; display: block; margin-top: 10px;">Katılım Rolü:</label>
+        <select id="roleSelect">
+            <option value="player">Oyuncu</option>
+            <option value="leader">Lider (Oda Yöneticisi)</option>
+        </select>
+
+        <button onclick="joinGame()" style="margin-top: 15px;">Odaya Gir</button>
     </div>
 
-    <!-- OYUN EKRANI (Başta gizli, isim girilince açılacak) -->
+    <!-- OYUN EKRANI -->
     <div id="gameScreen" class="hidden">
         <div class="card">
             <div>Oda Durumu: <span id="phase" style="font-weight: bold; color: #f59e0b;">Bekliyor...</span></div>
@@ -55,7 +62,7 @@
         <!-- SADECE LİDERİN GÖRECEĞİ PANEL -->
         <div id="leaderPanel" class="card hidden" style="border: 2px dashed #f59e0b;">
             <h3 style="color: #f59e0b; margin-top:0;">Lider Paneli</h3>
-            <button onclick="startMatch()">Oyunu Başlat (7 Kişi Olunca)</button>
+            <button onclick="startMatch()">Oyunu Başlat</button>
             <button class="danger-btn" onclick="resetGame()">Oyunu Sıfırla</button>
         </div>
     </div>
@@ -72,6 +79,8 @@
 
         function joinGame() {
             const nameInput = document.getElementById('playerNameInput').value.trim();
+            const roleInput = document.getElementById('roleSelect').value;
+
             if(!nameInput) {
                 alert("Lütfen geçerli bir isim yaz!");
                 return;
@@ -82,17 +91,15 @@
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('gameScreen').classList.remove('hidden');
             
-            logMessage(`${myName} odaya katıldı.`);
-            
-            // Şimdilik test amaçlı ilk giren kişiyi lider yapalım 
-            // (İleride Supabase'e ilk bağlanan kayıt olacak)
-            setAsLeader();
-        }
-
-        function setAsLeader() {
-            isLeader = true;
-            document.getElementById('leaderPanel').classList.remove('hidden');
-            logMessage("Odanın lideri sensin! Herkes toplandığında oyunu başlatabilirsin.");
+            if(roleInput === 'leader') {
+                isLeader = true;
+                document.getElementById('leaderPanel').classList.remove('hidden');
+                logMessage(`${myName} odaya **Lider** olarak katıldı.`);
+            } else {
+                isLeader = false;
+                document.getElementById('leaderPanel').classList.add('hidden');
+                logMessage(`${myName} odaya oyuncu olarak katıldı.`);
+            }
         }
 
         function submitAction() {
@@ -106,7 +113,7 @@
 
         function startMatch() {
             if(!isLeader) return;
-            logMessage("Lider oyunu başlattı! Roller dağıtılıyor...");
+            logMessage("Lider oyunu başlattı! Gece aşamasına geçiliyor...");
             document.getElementById('phase').innerText = "Gece (Aksiyon Zamanı)";
         }
 
