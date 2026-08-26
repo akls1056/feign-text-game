@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobil Feign - Rol Dağıtımı</title>
+    <title>Mobil Feign - Gece Motoru</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
         h1 { font-size: 1.5rem; text-align: center; color: #38bdf8; }
         .card { background: #1e293b; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        #log { height: 180px; overflow-y: scroll; background: #090d16; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px; }
+        #log { height: 200px; overflow-y: scroll; background: #090d16; padding: 10px; border-radius: 8px; font-family: monospace; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 10px; }
         select, button, input { width: 100%; padding: 12px; margin-top: 8px; border-radius: 8px; border: none; font-size: 1rem; box-sizing: border-box; }
         select, input { background: #334155; color: white; }
         button { background: #0ea5e9; color: white; font-weight: bold; cursor: pointer; }
@@ -59,20 +59,20 @@
         <div id="leaderPanel" class="card hidden" style="border: 2px dashed #f59e0b;">
             <h3 style="color: #f59e0b; margin-top:0;">Lider Paneli</h3>
             <button onclick="startMatch()">Oyunu Başlat & Rolleri Dağıt</button>
-            <button class="danger-btn" onclick="resetGame()">Oyunu Sıfırla</button>
+            <button style="background: #10b981; margin-top: 5px;" onclick="resolveNight()">Geceyi Bitir & Sabahı Hesapla</button>
+            <button class="danger-btn" style="margin-top: 5px;" onclick="resetGame()">Oyunu Sıfırla</button>
         </div>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://sulphxhrguiahelilyww.supabase.co';
-        // Supabase panelindeki klasik 'anon public' (eyJ ile başlayan) anahtarını buraya yazıyoruz:
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeGhyZ3VpYWhlbGlseXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MzU5MDIsImV4cCI6MjEwMzMxMTkwMn0.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let myName = "";
         let isLeader = false;
-        let gameState = { players: [], room_phase: "Bekliyor", actions: {} };
+        let gameState = { players: [], room_phase: "Bekliyor", actions: {}, logs: [] };
 
         function logMessage(msg) {
             const log = document.getElementById('log');
@@ -81,8 +81,8 @@
         }
 
         async function joinGame() {
-            const nameInput = document.getElementById('playerNameInput').value.trim();
-            const roleInput = document.getElementById('roleSelect').value;
+            const nameInput = document.getElementById('playerNameInput'].value.trim();
+            const roleInput = document.getElementById('roleSelect'].value;
 
             if(!nameInput) {
                 alert("Lütfen adını yaz!");
@@ -97,7 +97,7 @@
 
                 let currentPlayers = data.players || [];
                 if(!currentPlayers.find(p => p.name === myName)) {
-                    currentPlayers.push({ name: myName, role: 'Atanmadı' });
+                    currentPlayers.push({ name: myName, role: 'Atanmadı', status: 'Yaşıyor' });
                     await supabaseClient.from('game_state').update({ players: currentPlayers }).eq('id', 1);
                 }
 
@@ -136,7 +136,7 @@
             gameState = state;
             document.getElementById('phase').innerText = state.room_phase;
 
-            const pList = (state.players || []).map(p => p.name).join(', ');
+            const pList = (state.players || []).map(p => `${p.name} (${p.status || 'Yaşıyor'})`).join(', ');
             document.getElementById('playerListText').innerText = `Odadakiler: ${pList || 'Kimse yok'}`;
 
             const me = (state.players || []).find(p => p.name === myName);
@@ -144,10 +144,17 @@
                 document.getElementById('myRole').innerText = me.role;
             }
 
+            // Günlükleri senkronize et
+            if(state.logs && state.logs.length > 0) {
+                const logDiv = document.getElementById('log');
+                logDiv.innerHTML = state.logs.join('<br>') + '<br>';
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+
             const targetSelect = document.getElementById('targetSelect');
             targetSelect.innerHTML = '<option value="">Hedef Seç...</option>';
             (state.players || []).forEach(p => {
-                if(p.name !== myName) {
+                if(p.name !== myName && p.status !== 'Ölü') {
                     let opt = document.createElement('option');
                     opt.value = p.name;
                     opt.innerText = p.name;
@@ -169,14 +176,17 @@
             
             players.forEach((p, index) => {
                 p.role = shuffledRoles[index % shuffledRoles.length];
+                p.status = 'Yaşıyor';
             });
+
+            let initialLogs = ["Lider oyunu başlattı! Roller dağıtıldı. Gece vakti başladı."];
 
             await supabaseClient.from('game_state').update({ 
                 room_phase: 'Gece (Aksiyon Zamanı)', 
-                players: players 
+                players: players,
+                actions: {},
+                logs: initialLogs
             }).eq('id', 1);
-
-            logMessage("Lider oyunu başlattı ve roller dağıtıldı!");
         }
 
         async function submitAction() {
@@ -192,10 +202,83 @@
             logMessage(`Seçimin kaydedildi: ${target}`);
         }
 
+        // GECE HESAPLAMA MOTORU (Lider tetikler)
+        async function resolveNight() {
+            if(!isLeader) return;
+            let players = gameState.players || [];
+            let actions = gameState.actions || {};
+            let nightLogs = [...(gameState.logs || []), "--- GECE SONUÇLANDI ---"];
+
+            let doctorTarget = null;
+            let killerTarget = null;
+            let policeTarget = null;
+            let watcherTarget = null;
+            let scoutTarget = null;
+            let detectiveTarget = null;
+            let snitchTarget = null;
+            let provokerTarget = null;
+
+            // Oyuncuların aksiyonlarını rollere göre eşleştir
+            players.forEach(p => {
+                let target = actions[p.name];
+                if (!target) return;
+                if (p.role === 'Doktor') doctorTarget = { from: p.name, to: target };
+                if (p.role === 'Katil') killerTarget = { from: p.name, to: target };
+                if (p.role === 'Polis') policeTarget = { from: p.name, to: target };
+                if (p.role === 'Gözcü') watcherTarget = { from: p.name, to: target };
+                if (p.role === 'İzci') scoutTarget = { from: p.name, to: target };
+                if (p.role === 'Dedektif') detectiveTarget = { from: p.name, to: target };
+                if (p.role === 'İspiyoncu') snitchTarget = { from: p.name, to: target };
+                if (p.role === 'Provokatör') provokerTarget = { from: p.name, to: target };
+            });
+
+            // 1. Doktor & Katil Etkileşimi
+            let targetKilled = null;
+            if (killerTarget) {
+                targetKilled = killerTarget.to;
+                if (doctorTarget && doctorTarget.to === targetKilled) {
+                    nightLogs.push(`Doktor (${doctorTarget.from}), katilin hedefi olan ${targetKilled}'i başarıyla korudu!`);
+                    targetKilled = null; // Kurtuldu
+                } else {
+                    nightLogs.push(`Katil dehşet saçtı! ${targetKilled} gece saldırıya uğradı.`);
+                    let victim = players.find(p => p.name === targetKilled);
+                    if (victim) victim.status = 'Ölü';
+                }
+            }
+
+            // 2. Bilgi Rolleri Sonuçları
+            if (watcherTarget) {
+                let visitors = [];
+                if (killerTarget && killerTarget.to === watcherTarget.to) visitors.push("Katil");
+                if (doctorTarget && doctorTarget.to === watcherTarget.to) visitors.push("Doktor");
+                nightLogs.push(`[Gözcü Bilgisi] ${watcherTarget.from}, ${watcherTarget.to} isimli kişinin evine ${visitors.length} kişinin geldiğini gördü.`);
+            }
+
+            if (scoutTarget) {
+                let scoutedPlayer = players.find(p => p.name === scoutTarget.to);
+                let destination = actions[scoutTarget.to] || "hiçbir yere gitmedi";
+                nightLogs.push(`[İzci Bilgisi] ${scoutTarget.from}, ${scoutTarget.to}'in ${destination} adresine gittiğini öğrendi.`);
+            }
+
+            if (snitchTarget) {
+                let targetPlayer = players.find(p => p.name === snitchTarget.to);
+                nightLogs.push(`[İspiyoncu Bilgisi] ${snitchTarget.from} sabah ${snitchTarget.to} kişinin rolünü öğrendi (Sadece kendisine özel).`);
+            }
+
+            nightLogs.push("Sabah oldu, kasaba uyanıyor! Tartışma ve oylama başlayabilir.");
+
+            await supabaseClient.from('game_state').update({ 
+                room_phase: 'Gündüz (Tartışma & Oylama)', 
+                players: players,
+                actions: {},
+                logs: nightLogs
+            }).eq('id', 1);
+        }
+
         async function resetGame() {
             if(!isLeader) return;
             if(confirm("Odayı sıfırlamak istiyor musun?")) {
-                await supabaseClient.from('game_state').update({ room_phase: 'Bekliyor', players: [], actions: {} }).eq('id', 1);
+                await supabaseClient.from('game_state').update({ room_phase: 'Bekliyor', players: [], actions: {}, logs: [] }).eq('id', 1);
                 location.reload();
             }
         }
