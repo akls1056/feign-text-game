@@ -66,7 +66,7 @@
 
     <script>
         const SUPABASE_URL = 'https://sulphxhrguiahelilyww.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeGhyZ3VpYWhlbGlseXd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3MzU5MDIsImV4cCI6MjEwMzMxMTkwMn0.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN1bHBoeHJndWlhaGVsaWx5d3ciLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4NzczNTkwMiwiZXhwIjoyMTAzMzExOTAyfQ.2WlzJyrIjWv0keYumuZp1EeB8GFnUY68uWdvjHgFS4M';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -81,8 +81,8 @@
         }
 
         async function joinGame() {
-            const nameInput = document.getElementById('playerNameInput'].value.trim();
-            const roleInput = document.getElementById('roleSelect'].value;
+            const nameInput = document.getElementById('playerNameInput').value.trim();
+            const roleInput = document.getElementById('roleSelect').value;
 
             if(!nameInput) {
                 alert("Lütfen adını yaz!");
@@ -144,7 +144,6 @@
                 document.getElementById('myRole').innerText = me.role;
             }
 
-            // Günlükleri senkronize et
             if(state.logs && state.logs.length > 0) {
                 const logDiv = document.getElementById('log');
                 logDiv.innerHTML = state.logs.join('<br>') + '<br>';
@@ -202,7 +201,6 @@
             logMessage(`Seçimin kaydedildi: ${target}`);
         }
 
-        // GECE HESAPLAMA MOTORU (Lider tetikler)
         async function resolveNight() {
             if(!isLeader) return;
             let players = gameState.players || [];
@@ -211,34 +209,26 @@
 
             let doctorTarget = null;
             let killerTarget = null;
-            let policeTarget = null;
             let watcherTarget = null;
             let scoutTarget = null;
-            let detectiveTarget = null;
             let snitchTarget = null;
-            let provokerTarget = null;
 
-            // Oyuncuların aksiyonlarını rollere göre eşleştir
             players.forEach(p => {
                 let target = actions[p.name];
                 if (!target) return;
                 if (p.role === 'Doktor') doctorTarget = { from: p.name, to: target };
                 if (p.role === 'Katil') killerTarget = { from: p.name, to: target };
-                if (p.role === 'Polis') policeTarget = { from: p.name, to: target };
                 if (p.role === 'Gözcü') watcherTarget = { from: p.name, to: target };
                 if (p.role === 'İzci') scoutTarget = { from: p.name, to: target };
-                if (p.role === 'Dedektif') detectiveTarget = { from: p.name, to: target };
                 if (p.role === 'İspiyoncu') snitchTarget = { from: p.name, to: target };
-                if (p.role === 'Provokatör') provokerTarget = { from: p.name, to: target };
             });
 
-            // 1. Doktor & Katil Etkileşimi
             let targetKilled = null;
             if (killerTarget) {
                 targetKilled = killerTarget.to;
                 if (doctorTarget && doctorTarget.to === targetKilled) {
                     nightLogs.push(`Doktor (${doctorTarget.from}), katilin hedefi olan ${targetKilled}'i başarıyla korudu!`);
-                    targetKilled = null; // Kurtuldu
+                    targetKilled = null;
                 } else {
                     nightLogs.push(`Katil dehşet saçtı! ${targetKilled} gece saldırıya uğradı.`);
                     let victim = players.find(p => p.name === targetKilled);
@@ -246,7 +236,6 @@
                 }
             }
 
-            // 2. Bilgi Rolleri Sonuçları
             if (watcherTarget) {
                 let visitors = [];
                 if (killerTarget && killerTarget.to === watcherTarget.to) visitors.push("Katil");
@@ -255,14 +244,12 @@
             }
 
             if (scoutTarget) {
-                let scoutedPlayer = players.find(p => p.name === scoutTarget.to);
                 let destination = actions[scoutTarget.to] || "hiçbir yere gitmedi";
                 nightLogs.push(`[İzci Bilgisi] ${scoutTarget.from}, ${scoutTarget.to}'in ${destination} adresine gittiğini öğrendi.`);
             }
 
             if (snitchTarget) {
-                let targetPlayer = players.find(p => p.name === snitchTarget.to);
-                nightLogs.push(`[İspiyoncu Bilgisi] ${snitchTarget.from} sabah ${snitchTarget.to} kişinin rolünü öğrendi (Sadece kendisine özel).`);
+                nightLogs.push(`[İspiyoncu Bilgisi] ${snitchTarget.from} sabah ${snitchTarget.to} kişinin rolünü öğrendi.`);
             }
 
             nightLogs.push("Sabah oldu, kasaba uyanıyor! Tartışma ve oylama başlayabilir.");
